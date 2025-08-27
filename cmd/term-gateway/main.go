@@ -14,6 +14,7 @@ import (
 	"term-gateway/internal/session"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -103,31 +104,24 @@ func handleCreateSession(s *session.Server) http.Handler {
 }
 
 func addRoutes(
-	mux *http.ServeMux,
+	r *mux.Router,
 	s *session.Server,
 ) {
 	// Here you would typically set up your routes, e.g.:
 	// http.HandleFunc("/example", s.exampleHandler)
-	mux.Handle("/sessions", handleCreateSession(s))
+	r.Handle("/sessions",
+		http.TimeoutHandler(handleCreateSession(s), 30*time.Second, "Request timed out"),
+	).Methods(http.MethodPost)
 	// mux.HandleFunc("/sessions/{id}", s.getSession).Methods("GET")
 	// mux.HandleFunc("/sessions/{id}", s.deleteSession).Methods("DELETE")
-	mux.HandleFunc("/sessions/{id}/attach", s.WsAttach)
+	r.HandleFunc("/sessions/{id}/attach", s.WsAttach).Methods("GET")
 }
 
 // NewServer creates a new HTTP server with the specified routes and middleware.
 func NewServerMux(s *session.Server) http.Handler {
-	mux := http.NewServeMux()
-
-	// Add your routes to the mux
-	addRoutes(mux, s)
-
-	// You can add middleware here, such as logging or recovery middleware.
-	// For example, you might use a logging middleware like this:
-	// mux.Handle("/", loggingMiddleware(http.HandlerFunc(yourHandler)))
-	var handler http.Handler = mux
-	handler = http.TimeoutHandler(handler, 30*time.Second, "Request timed out")
-
-	return handler
+	r := mux.NewRouter()
+	addRoutes(r, s)
+	return r
 }
 
 func run(ctx context.Context, w io.Writer, args []string) error {

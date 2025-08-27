@@ -163,6 +163,8 @@ func (s *Server) CreateSession(ns string, req CreateReq) (CreateResp, error) {
 }
 
 func (s *Server) deleteSessionByID(id string) {
+	fmt.Println("Deleting session:", id)
+
 	s.Mu.Lock()
 	ss, ok := s.Sessions[id]
 	if ok {
@@ -172,6 +174,7 @@ func (s *Server) deleteSessionByID(id string) {
 	if ok {
 		ss.Cancel()
 		_ = s.Core.Pods(ss.Namespace).Delete(context.Background(), ss.PodName, meta.DeleteOptions{})
+		fmt.Println("Deleted pod:", ss.PodName)
 	}
 }
 
@@ -217,8 +220,12 @@ func (s *Server) WsAttach(w http.ResponseWriter, r *http.Request) {
 		t := time.NewTicker(pingPeriod)
 		defer t.Stop()
 		for range t.C {
+			wmu.Lock()
 			_ = conn.SetWriteDeadline(time.Now().Add(ws.WebsocketWriteWait))
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			err := conn.WriteMessage(websocket.PingMessage, nil)
+			wmu.Unlock()
+			if err != nil {
+				_ = conn.Close() // or cancel()
 				return
 			}
 		}
