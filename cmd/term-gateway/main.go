@@ -149,7 +149,7 @@ func run(ctx context.Context, w io.Writer, args []string) error {
 			ReadBufferSize:  readBufLimit,
 			WriteBufferSize: readBufLimit,
 		},
-		BaseURL: env("PUBLIC_BASE_URL", "http://localhost:8080"),
+		BaseURL: env("PUBLIC_BASE_URL", "ws://localhost:8080"),
 	}
 
 	srvMux := NewServerMux(s)

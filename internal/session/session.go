@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	ws "term-gateway/internal/websocket"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -174,7 +176,8 @@ func (s *Server) deleteSessionByID(id string) {
 }
 
 func (s *Server) WsAttach(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	vars := mux.Vars(r)
+	id := vars["id"]
 	if id == "" {
 		http.Error(w, "Session ID is required", http.StatusBadRequest)
 		return
@@ -188,6 +191,7 @@ func (s *Server) WsAttach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// upgrade connection
 	conn, err := s.Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "Failed to upgrade connection: "+err.Error(), http.StatusInternalServerError)
@@ -202,6 +206,11 @@ func (s *Server) WsAttach(w http.ResponseWriter, r *http.Request) {
 		_ = conn.SetReadDeadline(time.Now().Add(websocketReadWait))
 		return nil
 	})
+
+	var wmu sync.Mutex
+	// initialize readwriter
+	wsrw := ws.NewWSReadWriter(conn, &wmu)
+	defer wsrw.Close()
 
 	// Heartbeat
 	go func() {
@@ -238,23 +247,8 @@ func (s *Server) WsAttach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wsrw := ws.NewWSReadWriter(conn)
-	defer wsrw.Close()
-
 	streamCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	// Close session if websocket dies
-	go func() {
-		for {
-			// Consume control frames to detect closure
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				cancel()
-				return
-			}
-		}
-	}()
 
 	// Start exec stream
 	err = exec.StreamWithContext(streamCtx, remotecommand.StreamOptions{
@@ -269,7 +263,5 @@ func (s *Server) WsAttach(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cleanup pod when stream ends
-	go func() {
-		s.deleteSessionByID(id)
-	}()
+	s.deleteSessionByID(id) // no goroutine needed
 }

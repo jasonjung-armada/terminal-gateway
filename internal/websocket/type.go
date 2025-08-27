@@ -11,7 +11,7 @@ import (
 type WsReadWriter struct {
 	Conn   *websocket.Conn
 	R      io.Reader
-	RMu    sync.Mutex
+	WMu    *sync.Mutex
 	Closed int32
 	Resize chan remotecommand.TerminalSize
 }
