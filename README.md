@@ -10,3 +10,8 @@
     - Bridges the WebSocket to a kubectl exec session inside the pod (stdin/stdout/stderr + TTY).
     - Supports resize messages and heartbeat pings.
     - When the WebSocket closes, the exec stream ends and the pod/session is cleaned up.
+
+## To do:
+- Atlas integration
+- Clean up logic
+- Authn/z story?
