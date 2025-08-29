@@ -12,6 +12,6 @@
     - When the WebSocket closes, the exec stream ends and the pod/session is cleaned up.
 
 ## To do:
-- Atlas integration
+- Atlas integration + how to pull/consume arc kubeconfig
 - Clean up logic
 - Authn/z story?
